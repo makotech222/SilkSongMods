@@ -26,6 +26,8 @@ public class SilksongQOLMod : BaseUnityPlugin
         Patch.SilkNeverDecreases = Config.Bind("1. Cheats", "Silk Never Decreases", false, "").Value;
         Patch.AddToolSlots = Config.Bind("1. Cheats", "Add 25 yellow and blue slots to unlocked crests", false, "Experimental. Does affect save data, so be sure to backup").Value;
         Patch.DisableVignette = Config.Bind("1. Cheats", "Disable Vignette", false, "").Value;
+        Patch.InfToolUsage = Config.Bind("1. Cheats", "Infinite Tool Usage", false, "").Value;
+        Patch.AlwaysFleaBrew = Config.Bind("1. Cheats", "Flea Brew effect always on", false, "").Value;
     }
 
 }
@@ -38,6 +40,8 @@ public class Patch
     public static bool SilkNeverDecreases { get; set; }
     public static bool AddToolSlots { get; set; }
     public static bool DisableVignette { get; set; }
+    public static bool InfToolUsage { get; set; }
+    public static bool AlwaysFleaBrew { get; set; }
 
     [HarmonyPatch(typeof(PlayerData), "AddGeo")]
     [HarmonyPrefix]
@@ -148,5 +152,28 @@ public class Patch
             existingYellow++;
         }
         Traverse.Create(newCrestData).Field("slots").SetValue(t.ToArray());
+    }
+
+    [HarmonyPatch(typeof(HeroController), "DidUseAttackTool")]
+    [HarmonyPrefix]
+    private static void InfToolUsage_Patch(HeroController __instance, ref ToolItemsData.Data toolData)
+    {
+        if (!InfToolUsage)
+            return;
+        var tool = Traverse.Create(__instance).Field("willThrowTool").GetValue() as ToolItem;
+        if (!tool.IsCustomUsage && toolData.AmountLeft > 0)
+        {
+            toolData.AmountLeft++;
+            tool.SavedData = toolData;
+        }
+    }
+
+    [HarmonyPatch(typeof(HeroController), "IsUsingQuickening", MethodType.Getter)]
+    [HarmonyPostfix]
+    private static void AlwaysFleaBrew_Patch(HeroController __instance, ref bool __result)
+    {
+        if (!AlwaysFleaBrew)
+            return;
+        __result = true;
     }
 }
