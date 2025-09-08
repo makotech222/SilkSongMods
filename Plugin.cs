@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Xml.Linq;
 using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
 using HutongGames.PlayMaker.Actions;
+using TeamCherry.NestedFadeGroup;
 using UnityEngine;
 
 namespace MakoMod;
@@ -28,7 +30,7 @@ public class SilksongQOLMod : BaseUnityPlugin
         LoadConfig();
         Harmony.CreateAndPatchAll(typeof(Patch));
         _addItem = new KeyboardShortcut(KeyCode.KeypadPlus, KeyCode.LeftControl);
-        _altAddItem = new KeyboardShortcut(KeyCode.Plus, KeyCode.LeftControl);
+        _altAddItem = new KeyboardShortcut(KeyCode.Equals, KeyCode.LeftControl);
         _removeItem = new KeyboardShortcut(KeyCode.KeypadMinus, KeyCode.LeftControl);
         _altRemoveItem = new KeyboardShortcut(KeyCode.Minus, KeyCode.LeftControl);
 
@@ -91,13 +93,15 @@ public class SilksongQOLMod : BaseUnityPlugin
         Patch.DisableVignette = Config.Bind("1. Cheats", "Disable Vignette", false, "").Value;
         Patch.InfToolUsage = Config.Bind("1. Cheats", "Infinite Tool Usage", false, "").Value;
         Patch.AlwaysFleaBrew = Config.Bind("1. Cheats", "Flea Brew effect always on", false, "").Value;
+        Patch.AlwaysNailElementImbue = Config.Bind("1. Cheats", "Flintslate effect always on with given element", "None", "Rest at bench once to initiate buff. Allowed Values: None, Fire, Poison").Value;
+        Patch.DisableNailElementImbueSpriteEffect = Config.Bind("1. Cheats", "Remove Flintslate sprite effects", false, "Graphical change only. Turns off flashing effect and glow effect").Value;
     }
 
 }
 
 public class Patch
 {
-    internal static new ManualLogSource Logger;
+    internal static ManualLogSource Logger;
     public static int RosaryMultiplier { get; set; }
     public static int ShardsMultiplier { get; set; }
     public static bool SilkNeverDecreases { get; set; }
@@ -105,6 +109,8 @@ public class Patch
     public static bool DisableVignette { get; set; }
     public static bool InfToolUsage { get; set; }
     public static bool AlwaysFleaBrew { get; set; }
+    public static string AlwaysNailElementImbue { get; set; }
+    public static bool DisableNailElementImbueSpriteEffect { get; set; }
 
     [HarmonyPatch(typeof(PlayerData), "AddGeo")]
     [HarmonyPrefix]
@@ -238,5 +244,42 @@ public class Patch
         if (!AlwaysFleaBrew)
             return;
         __result = true;
+    }
+
+    [HarmonyPatch(typeof(HeroNailImbuement), "SetElement")]
+    [HarmonyPrefix]
+    private static void HeroNailImbuement_Patch(HeroNailImbuement __instance, ref NailElements element)
+    {
+        if (AlwaysNailElementImbue == "None" || (AlwaysNailElementImbue != "Fire" && AlwaysNailElementImbue != "Poison"))
+            return;
+        if (Enum.TryParse<NailElements>(AlwaysNailElementImbue, true, out NailElements newElement))
+        {
+            element = newElement;
+        }
+    }
+
+    [HarmonyPatch(typeof(HeroNailImbuement), "SetElement")]
+    [HarmonyPostfix]
+    private static void HeroNailImbuementPost_Patch(HeroNailImbuement __instance, ref NailElements element)
+    {
+        if (!DisableNailElementImbueSpriteEffect)
+            return;
+        
+        var sprite = Traverse.Create(__instance).Field("imbuedHeroLightRenderer").GetValue() as SpriteRenderer;
+        if (sprite != null)
+        {
+            sprite.enabled = false;
+        }
+        var spriteFlash = Traverse.Create(__instance).Field("spriteFlash").GetValue() as SpriteFlash;
+        if (spriteFlash != null)
+        {
+            var spriteFlashHandle = (SpriteFlash.FlashHandle)Traverse.Create(__instance).Field("flashingHandle").GetValue();
+            spriteFlash.CancelRepeatingFlash(spriteFlashHandle);
+        }
+        var imbuedHeroLightGroup = Traverse.Create(__instance).Field("imbuedHeroLightGroup").GetValue() as NestedFadeGroupBase;
+        if (imbuedHeroLightGroup != null)
+        {
+            imbuedHeroLightGroup.FadeTo(0f, 1, null, false, null);
+        }
     }
 }
