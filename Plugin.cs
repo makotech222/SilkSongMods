@@ -1,8 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using BepInEx;
+using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
+using HutongGames.PlayMaker.Actions;
 using UnityEngine;
 
 namespace MakoMod;
@@ -10,12 +13,73 @@ namespace MakoMod;
 [BepInPlugin(MyPluginInfo.PLUGIN_GUID, MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
 public class SilksongQOLMod : BaseUnityPlugin
 {
+    private KeyboardShortcut _addItem;
+    private KeyboardShortcut _altAddItem;
+    private KeyboardShortcut _removeItem;
+    private KeyboardShortcut _altRemoveItem;
+    private KeyboardShortcut _upItem;
+    private KeyboardShortcut _downItem;
+    private int _itemIndex = -1;
+    public static CollectableItem SelectedItem { get; set; }
     private void Awake()
     {
         Patch.Logger = base.Logger;
         Patch.Logger.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
         LoadConfig();
         Harmony.CreateAndPatchAll(typeof(Patch));
+        _addItem = new KeyboardShortcut(KeyCode.KeypadPlus, KeyCode.LeftControl);
+        _altAddItem = new KeyboardShortcut(KeyCode.Plus, KeyCode.LeftControl);
+        _removeItem = new KeyboardShortcut(KeyCode.KeypadMinus, KeyCode.LeftControl);
+        _altRemoveItem = new KeyboardShortcut(KeyCode.Minus, KeyCode.LeftControl);
+
+        _upItem = new KeyboardShortcut(KeyCode.UpArrow, KeyCode.LeftControl);
+        _downItem = new KeyboardShortcut(KeyCode.DownArrow, KeyCode.LeftControl);
+    }
+
+    private void Update()
+    {
+        try
+        {
+            if ((_addItem.IsDown() || _altAddItem.IsDown()) && _itemIndex > 0)
+            {
+                var items = CollectableItemManager.Instance.GetAllCollectables().OrderBy(x => x.GetDisplayName(CollectableItem.ReadSource.Inventory)).ToList();
+                var item = items[_itemIndex];
+                Logger.LogInfo($"Adding Item: {item.GetDisplayName(CollectableItem.ReadSource.Inventory)}");
+                //CollectableItemManager.AddItem(item, 1);
+                item.Collect();
+            }
+            if ((_removeItem.IsDown() || _altRemoveItem.IsDown()) && _itemIndex > 0)
+            {
+                var items = CollectableItemManager.Instance.GetAllCollectables().OrderBy(x => x.GetDisplayName(CollectableItem.ReadSource.Inventory)).ToList();
+                var item = items[_itemIndex];
+                Logger.LogInfo($"Removing Item: {item.GetDisplayName(CollectableItem.ReadSource.Inventory)}");
+                //CollectableItemManager.AddItem(item, 1);
+                item.Take();
+            }
+            if (_upItem.IsDown())
+            {
+                var items = CollectableItemManager.Instance.GetAllCollectables().OrderBy(x => x.GetDisplayName(CollectableItem.ReadSource.Inventory)).ToList();
+                _itemIndex += 1;
+                _itemIndex  = _itemIndex > items.Count - 1 ? 0 : _itemIndex;
+                var item = items[_itemIndex];
+                Logger.LogInfo($"Selected Item: {item.GetDisplayName(CollectableItem.ReadSource.Inventory)}");
+                CollectableUIMsg collectableUIMsg = CollectableUIMsg.Spawn(item, null, false);
+            }
+            if (_downItem.IsDown())
+            {
+                var items = CollectableItemManager.Instance.GetAllCollectables().OrderBy(x => x.GetDisplayName(CollectableItem.ReadSource.Inventory)).ToList();
+                _itemIndex -= 1;
+                _itemIndex = _itemIndex < 0 ? items.Count - 1 : _itemIndex;
+                var item = items[_itemIndex];
+                Logger.LogInfo($"Selected Item: {item.GetDisplayName(CollectableItem.ReadSource.Inventory)}");
+                CollectableUIMsg collectableUIMsg = CollectableUIMsg.Spawn(item, null, false);
+            }
+
+        }
+        catch (Exception ex)
+        {
+           
+        }
     }
 
     public void LoadConfig()
