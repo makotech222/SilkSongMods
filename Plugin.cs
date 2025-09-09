@@ -89,7 +89,8 @@ public class SilksongQOLMod : BaseUnityPlugin
         Patch.RosaryMultiplier = Config.Bind("1. Cheats", "Rosary recieved multiplier", 1, "").Value;
         Patch.ShardsMultiplier = Config.Bind("1. Cheats", "Shards recieved multiplier", 1, "").Value;
         Patch.SilkNeverDecreases = Config.Bind("1. Cheats", "Silk Never Decreases", false, "").Value;
-        Patch.AddToolSlots = Config.Bind("1. Cheats", "Add 25 yellow and blue slots to unlocked crests", false, "Experimental. Does affect save data, so be sure to backup").Value;
+        Patch.AddYellowToolSlots = Config.Bind("1. Cheats", "Add yellow tool slots to unlocked crests", 0, "").Value;
+        Patch.AddBlueToolSlots = Config.Bind("1. Cheats", "Add blue tool slots to unlocked crests", 0, "").Value;
         Patch.DisableVignette = Config.Bind("1. Cheats", "Disable Vignette", false, "").Value;
         Patch.InfToolUsage = Config.Bind("1. Cheats", "Infinite Tool Usage", false, "").Value;
         Patch.AlwaysFleaBrew = Config.Bind("1. Cheats", "Flea Brew effect always on", false, "").Value;
@@ -105,7 +106,8 @@ public class Patch
     public static int RosaryMultiplier { get; set; }
     public static int ShardsMultiplier { get; set; }
     public static bool SilkNeverDecreases { get; set; }
-    public static bool AddToolSlots { get; set; }
+    public static int AddYellowToolSlots { get; set; }
+    public static int AddBlueToolSlots { get; set; }
     public static bool DisableVignette { get; set; }
     public static bool InfToolUsage { get; set; }
     public static bool AlwaysFleaBrew { get; set; }
@@ -132,19 +134,6 @@ public class Patch
     {
         amount = (SilkNeverDecreases ? 0 : amount);
     }
-
-    //[HarmonyPatch(typeof(ToolItemManager), "IsToolEquipped",typeof(string))]
-    //[HarmonyPostfix]
-    //private static void IsEquippedPostFix(ToolItemManager __instance, string name, ref bool __result)
-    //{
-    //    if (!EquipAllTools)
-    //        return;
-    //    var tool = ToolItemManager.GetToolByName(name);
-    //    if (tool.IsUnlockedNotHidden && tool.Type != ToolItemType.Red && tool.Type != ToolItemType.Skill)
-    //    {
-    //        __result = true;
-    //    }
-    //}
 
     [HarmonyPatch(typeof(HeroController), "Respawn")]
     [HarmonyPostfix]
@@ -178,17 +167,14 @@ public class Patch
     [HarmonyPrefix]
     private static void ToolItemManagerSetEquippedCrestPostfix(InventoryToolCrest __instance, ref ToolCrest newCrestData)
     {
-        if (!__instance.IsUnlocked || !AddToolSlots)
+        if (!__instance.IsUnlocked || (AddYellowToolSlots == 0 && AddBlueToolSlots == 0))
             return;
 
         var slots = Traverse.Create(newCrestData).Field("slots").GetValue() as ToolCrest.SlotInfo[];
         var t = slots.ToList();
-        var existingBlue = slots.Where(x => x.Type == ToolItemType.Blue).Count();
-        var existingYellow = slots.Where(x => x.Type == ToolItemType.Yellow).Count();
-        Logger.LogInfo($"Adding crest slots for {newCrestData?.name}. Current blue: {existingBlue} current yellow: {existingYellow}");
         float vecX = -4f;
         float vecY = -2f;
-        while (existingBlue <= 15)
+        for (int i = 0; i < AddBlueToolSlots; i++)
         {
             t.Add(new ToolCrest.SlotInfo()
             {
@@ -197,14 +183,13 @@ public class Patch
                 Position = new Vector2 (vecX, vecY),
             });
             vecX += 1f;
-            if (vecX >= 4f)
+            if (vecX >= 3f)
             {
                 vecX = -4f;
                 vecY -= 1f;
             }
-            existingBlue++;
         }
-        while (existingYellow <= 15)
+        for (int i = 0; i < AddYellowToolSlots; i++)
         {
             t.Add(new ToolCrest.SlotInfo()
             {
@@ -213,12 +198,11 @@ public class Patch
                 Position = new Vector2(vecX, vecY),
             });
             vecX += 1f;
-            if (vecX >= 4f)
+            if (vecX >= 3f)
             {
                 vecX = -4f;
                 vecY -= 1f;
             }
-            existingYellow++;
         }
         Traverse.Create(newCrestData).Field("slots").SetValue(t.ToArray());
     }
