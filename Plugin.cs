@@ -113,6 +113,7 @@ public class Patch
     public static bool AlwaysFleaBrew { get; set; }
     public static string AlwaysNailElementImbue { get; set; }
     public static bool DisableNailElementImbueSpriteEffect { get; set; }
+    private static List<string> UpdatedCrests { get; set; } = new List<string>();
 
     [HarmonyPatch(typeof(PlayerData), "AddGeo")]
     [HarmonyPrefix]
@@ -167,7 +168,8 @@ public class Patch
     [HarmonyPrefix]
     private static void ToolItemManagerSetEquippedCrestPostfix(InventoryToolCrest __instance, ref ToolCrest newCrestData)
     {
-        if (!__instance.IsUnlocked || (AddYellowToolSlots == 0 && AddBlueToolSlots == 0))
+        string crestName = newCrestData.name;
+        if (!__instance.IsUnlocked || (AddYellowToolSlots == 0 && AddBlueToolSlots == 0) || UpdatedCrests.Exists(x => x == crestName))
             return;
 
         var slots = Traverse.Create(newCrestData).Field("slots").GetValue() as ToolCrest.SlotInfo[];
@@ -205,6 +207,7 @@ public class Patch
             }
         }
         Traverse.Create(newCrestData).Field("slots").SetValue(t.ToArray());
+        UpdatedCrests.Add(crestName);
     }
 
     [HarmonyPatch(typeof(HeroController), "DidUseAttackTool")]
